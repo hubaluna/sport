@@ -1,5 +1,5 @@
 /* The entire application is inline in this versioned HTML shell. Journal data lives in localStorage. */
-const VERSION='4.5',PREFIX='forge-standalone-'+encodeURIComponent(new URL(self.registration.scope).pathname)+'-',CACHE=PREFIX+VERSION;
+const VERSION='4.6',PREFIX='forge-standalone-'+encodeURIComponent(new URL(self.registration.scope).pathname)+'-',CACHE=PREFIX+VERSION;
 const ASSETS=['index.html','manifest.webmanifest','assets/icon-192.png','assets/icon-512.png','assets/icon-maskable.png'];
 const absolute=name=>new URL(name,self.registration.scope).href;
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(CACHE);for(const name of ASSETS){const req=new Request(absolute(name),{cache:'reload',credentials:'same-origin'}),res=await fetch(req);if(!res.ok||res.redirected||new URL(res.url).origin!==self.location.origin)throw Error('Incomplete application release');if(name==='index.html'&&!(await res.clone().text()).includes('<meta name="forge-version" content="'+VERSION+'">'))throw Error('Release version mismatch');await cache.put(req,res);}})()));
