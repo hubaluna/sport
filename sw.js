@@ -1,5 +1,5 @@
-/* FORGE / 8 PWA Service Worker v5.1 */
-const VERSION='5.1',PREFIX='forge-standalone-'+encodeURIComponent(new URL(self.registration.scope).pathname)+'-',CACHE=PREFIX+VERSION;
+/* FORGE / 8 PWA Service Worker v5.2 */
+const VERSION='5.2',PREFIX='forge-standalone-'+encodeURIComponent(new URL(self.registration.scope).pathname)+'-',CACHE=PREFIX+VERSION;
 const ASSETS=['index.html','manifest.webmanifest','assets/icon-192.png','assets/icon-512.png','assets/icon-maskable.png'];
 const absolute=name=>new URL(name,self.registration.scope).href;
 
