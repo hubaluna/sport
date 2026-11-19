@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="uk" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>FORGE / 8 — мобільний тренер</title>
+    <meta
+      name="description"
+      content="8-тижнева програма силової підготовки, підтягувань та CrossFit-комплексів із покроковим таймером і автоматичним щоденником."
+    />
+    <meta property="og:title" content="FORGE / 8 — мобільний тренер" />
+    <meta
+      property="og:description"
+      content="8-тижнева програма силової підготовки, підтягувань та CrossFit-комплексів із покроковим таймером і автоматичним щоденником."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#111310" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FORGE / 8" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Manrope:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      if (typeof caches !== 'undefined') {
+        caches.keys().then(function (keys) {
+          for (var i = 0; i < keys.length; i++) {
+            if (keys[i].indexOf('forge-standalone-') === 0) {
+              caches.delete(keys[i]);
+            }
+          }
+        });
+      }
+    </script>
+  </head>
+  <body class="bg-[#111310] text-[#F2F6EB] antialiased selection:bg-[#CEFA42] selection:text-[#111310]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
