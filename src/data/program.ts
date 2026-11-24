@@ -1,4 +1,4 @@
-export const APP_VERSION = '5.2';
+export const APP_VERSION = '5.3';
 export const PROGRAM_REVISION = 'crossfit-2026-10-v4.0';
 
 export const PROFILE = {
