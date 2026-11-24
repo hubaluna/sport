@@ -1,0 +1,52 @@
+{
+  "pushups": {
+    "sets": 3,
+    "reps": 9,
+    "rest": 90,
+    "repsMax": 10
+  },
+  "lunges": {
+    "sets": 2,
+    "reps": 9,
+    "rest": 60,
+    "repsMax": 10
+  },
+  "squats": {
+    "sets": 2,
+    "reps": 14,
+    "rest": 60
+  },
+  "bridge": {
+    "sets": 2,
+    "reps": 13,
+    "rest": 45
+  },
+  "bandRow": {
+    "sets": 2,
+    "reps": 13,
+    "rest": 60,
+    "repsMax": 15
+  },
+  "wheel": {
+    "sets": 2,
+    "reps": 6,
+    "rest": 75,
+    "repsMax": 6
+  },
+  "deadbug": {
+    "sets": 2,
+    "reps": 8,
+    "rest": 60
+  },
+  "scapPullups": {
+    "sets": 2,
+    "reps": 5,
+    "rest": 60
+  },
+  "negativePullups": {
+    "sets": 2,
+    "reps": 1,
+    "rest": 150,
+    "repsMax": 2
+  }
+}
