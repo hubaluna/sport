@@ -7,7 +7,7 @@ export const PROFILE = {
   height: 183,
   push: 16,
   pull: 0,
-  assisted: 0,
+  assisted: 1,
   assistedROM: 60,
   band: 'Товста зелена резинка',
 } as const;
@@ -21,15 +21,19 @@ export interface ExerciseTargetConfig {
 
 /**
  * Базові налаштування кількості підходів та повторень для вправ.
- * Адаптуються автоматично щотижня на основі щоденника тренувань.
+ * Адаптовано на основі фактичного щоденника тренувань:
+ * - Віджимання: підвищено до 3 × 8 (фактично 9-10)
+ * - Тяга резинки сидячи: підвищено до 2 × 12 (фактично 15)
+ * - Присідання: підвищено до 2 × 14
+ * - Колесо з колін: підвищено до 2 × 5
  */
 export const PROGRAM_TARGETS: Record<string, ExerciseTargetConfig> = {
-  pushups: { sets: 3, reps: 6, rest: 90, repsMax: 8 },
-  lunges: { sets: 2, reps: 8, rest: 60 },
-  squats: { sets: 2, reps: 12, rest: 60 },
+  pushups: { sets: 3, reps: 8, rest: 90, repsMax: 10 },
+  lunges: { sets: 2, reps: 8, rest: 60, repsMax: 10 },
+  squats: { sets: 2, reps: 14, rest: 60 },
   bridge: { sets: 2, reps: 12, rest: 45 },
-  bandRow: { sets: 2, reps: 10, rest: 60, repsMax: 12 },
-  wheel: { sets: 2, reps: 4, rest: 75, repsMax: 6 },
+  bandRow: { sets: 2, reps: 12, rest: 60, repsMax: 15 },
+  wheel: { sets: 2, reps: 5, rest: 75, repsMax: 6 },
   deadbug: { sets: 2, reps: 8, rest: 60 },
   scapPullups: { sets: 2, reps: 5, rest: 60 },
   negativePullups: { sets: 2, reps: 1, rest: 150, repsMax: 2 },
