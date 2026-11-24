@@ -338,6 +338,7 @@ export interface ForgeState {
   googleDriveSecret?: string;
   googleDriveAutoSync?: boolean;
   lastSyncedAt?: number;
+  pendingSyncIds?: string[];
 }
 
 export interface ExerciseHelp {

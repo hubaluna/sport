@@ -4,11 +4,11 @@
  * FORGE / 8 - Щотижневий автономний аналізатор тренувань та адаптер програми.
  *
  * Запускається щонеділі о 23:00 (через Antigravity scheduler або cron):
- * 1. Завантажує збережені за тиждень тренування з Google Диска (через Web App URL).
- * 2. Аналізує виконання вправ: віджимання, підтягування, присідання, випади, комплекс CrossFit.
- * 3. Враховує біль (pain == 0), суб'єктивне навантаження (RPE <= 8) та запас повторень (reserve >= 1).
- * 4. Адаптує кількість підходів і повторень у src/data/program.ts (PROGRAM_TARGETS).
- * 5. Запускає тести (npm test) та збірку (npm run build).
+ * 1. Завантажує збережені за тиждень тренування з Google Таблиці (через Web App URL).
+ * 2. Аналізує виконання вправ: віджимання, підтягування, тягу резинки, присідання, випади, міст, кор.
+ * 3. Враховує біль (pain == 0) та завершені підходи.
+ * 4. Адаптує кількість підходів і повторень у src/data/targets.json.
+ * 5. Запускає перевірку типів, тести (npm test) та збірку (npm run build).
  * 6. Фіксує зміни в git та публікує на GitHub Pages (git push).
  */
 
@@ -20,10 +20,9 @@ import {fileURLToPath} from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
-const programPath = path.join(rootDir, 'src', 'data', 'program.ts');
+const targetsPath = path.join(rootDir, 'src', 'data', 'targets.json');
 const configPath = path.join(__dirname, 'coach_config.json');
 
-// Читання конфігурації
 let config = {};
 if (fs.existsSync(configPath)) {
   try {
@@ -33,7 +32,6 @@ if (fs.existsSync(configPath)) {
   }
 }
 
-// Підтримка аргументів командного рядка
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--url' && args[i + 1]) config.url = args[++i];
@@ -59,18 +57,17 @@ async function run() {
 
   let workouts = [];
   if (config.url) {
-    console.log(`Отримання тренувань з Google Диска (${config.url})...`);
+    console.log(`Отримання тренувань з Google Таблиці...`);
     try {
       workouts = await fetchWorkouts(config.url, config.secret);
       console.log(`Успішно завантажено записів: ${workouts.length}`);
     } catch (err) {
-      console.error(`Помилка отримання даних з Google Диска: ${err.message}`);
+      console.error(`Помилка отримання даних: ${err.message}`);
     }
   } else {
-    console.log('Google Drive URL ще не налаштовано в scripts/coach_config.json.');
+    console.log('Google URL ще не налаштовано в scripts/coach_config.json.');
   }
 
-  // Фільтруємо тренування за останні 7 днів
   const now = Date.now();
   const weekMs = 7 * 24 * 60 * 60 * 1000;
   const recentWorkouts = workouts.filter((w) => {
@@ -85,25 +82,7 @@ async function run() {
     return;
   }
 
-  // Аналіз навантаження та адаптація
-  let programContent = fs.readFileSync(programPath, 'utf8');
-
-  // Витягуємо поточний PROGRAM_TARGETS
-  const match = programContent.match(/export const PROGRAM_TARGETS: Record<string, ExerciseTargetConfig> = (\{[\s\S]*?\n\};)/);
-  if (!match) {
-    console.error('Не знайдено об’єкт PROGRAM_TARGETS у src/data/program.ts');
-    return;
-  }
-
-  const targetsStr = match[1].replace(/;\s*$/, '');
-  let targets;
-  try {
-    targets = eval(`(${targetsStr})`);
-  } catch (err) {
-    console.error('Помилка парсингу PROGRAM_TARGETS:', err);
-    return;
-  }
-
+  const targets = JSON.parse(fs.readFileSync(targetsPath, 'utf8'));
   const adaptations = [];
   let hasPain = false;
 
@@ -115,26 +94,35 @@ async function run() {
   }
 
   if (!hasPain && recentWorkouts.length >= 2) {
-    // Перевіряємо вправи у записах
-    let completedPushups = 0;
-    let completedSquats = 0;
-    let completedLunges = 0;
+    const counts = {
+      pushups: 0,
+      squats: 0,
+      lunges: 0,
+      bandRow: 0,
+      bridge: 0,
+      wheel: 0,
+      deadbug: 0,
+    };
 
     for (const w of recentWorkouts) {
-      if (Array.isArray(w.entries)) {
-        for (const e of w.entries) {
-          if (e.name && e.name.includes('Віджимання') && e.completed) completedPushups++;
-          if (e.name && e.name.includes('Присідання') && e.completed) completedSquats++;
-          if (e.name && e.name.includes('випади') && e.completed) completedLunges++;
-        }
+      if (!Array.isArray(w.entries)) continue;
+      for (const e of w.entries) {
+        if (!e.name || e.completed === false) continue;
+        const n = e.name.toLowerCase();
+        if (n.includes('віджимання')) counts.pushups++;
+        else if (n.includes('присідання')) counts.squats++;
+        else if (n.includes('випади')) counts.lunges++;
+        else if (n.includes('тяга резинки сидячи')) counts.bandRow++;
+        else if (n.includes('сідничний міст')) counts.bridge++;
+        else if (n.includes('колесо')) counts.wheel++;
+        else if (n.includes('мертвий жук')) counts.deadbug++;
       }
     }
 
-    // Адаптація віджимань
-    if (completedPushups >= 3 && targets.pushups) {
+    if (counts.pushups >= 3 && targets.pushups) {
       if (targets.pushups.reps < 12) {
         targets.pushups.reps += 1;
-        adaptations.push(`Віджимання: збільшено повторення до ${targets.pushups.reps} (підходів: ${targets.pushups.sets})`);
+        adaptations.push(`Віджимання: ${targets.pushups.sets} × ${targets.pushups.reps}`);
       } else if (targets.pushups.sets < 4) {
         targets.pushups.sets += 1;
         targets.pushups.reps = 8;
@@ -142,20 +130,34 @@ async function run() {
       }
     }
 
-    // Адаптація присідань
-    if (completedSquats >= 2 && targets.squats) {
-      if (targets.squats.reps < 16) {
-        targets.squats.reps += 1;
-        adaptations.push(`Присідання без стрибка: збільшено повторення до ${targets.squats.reps}`);
-      }
+    if (counts.squats >= 2 && targets.squats && targets.squats.reps < 18) {
+      targets.squats.reps += 1;
+      adaptations.push(`Присідання: ${targets.squats.sets} × ${targets.squats.reps}`);
     }
 
-    // Адаптація випадів
-    if (completedLunges >= 2 && targets.lunges) {
-      if (targets.lunges.reps < 12) {
-        targets.lunges.reps += 1;
-        adaptations.push(`Зворотні випади: збільшено повторення до ${targets.lunges.reps} на ногу`);
-      }
+    if (counts.lunges >= 2 && targets.lunges && targets.lunges.reps < 12) {
+      targets.lunges.reps += 1;
+      adaptations.push(`Випади: ${targets.lunges.sets} × ${targets.lunges.reps} на ногу`);
+    }
+
+    if (counts.bandRow >= 2 && targets.bandRow && targets.bandRow.reps < 16) {
+      targets.bandRow.reps += 1;
+      adaptations.push(`Тяга резинки сидячи: ${targets.bandRow.sets} × ${targets.bandRow.reps}`);
+    }
+
+    if (counts.bridge >= 2 && targets.bridge && targets.bridge.reps < 16) {
+      targets.bridge.reps += 1;
+      adaptations.push(`Сідничний міст: ${targets.bridge.sets} × ${targets.bridge.reps}`);
+    }
+
+    if (counts.wheel >= 2 && targets.wheel && targets.wheel.reps < 8) {
+      targets.wheel.reps += 1;
+      adaptations.push(`Колесо з колін: ${targets.wheel.sets} × ${targets.wheel.reps}`);
+    }
+
+    if (counts.deadbug >= 2 && targets.deadbug && targets.deadbug.reps < 12) {
+      targets.deadbug.reps += 1;
+      adaptations.push(`Мертвий жук: ${targets.deadbug.sets} × ${targets.deadbug.reps}`);
     }
   }
 
@@ -167,42 +169,35 @@ async function run() {
   console.log('\n--- Адаптація програми на наступний тиждень ---');
   adaptations.forEach((a) => console.log(`✓ ${a}`));
 
-  // Форматуємо оновлений PROGRAM_TARGETS
-  const formattedTargets = JSON.stringify(targets, null, 2)
-    .replace(/"([a-zA-Z0-9_]+)":/g, '$1:')
-    .replace(/"/g, "'");
+  fs.writeFileSync(targetsPath, JSON.stringify(targets, null, 2) + '\n', 'utf8');
+  console.log('\nsrc/data/targets.json успішно оновлено!');
 
-  const replacement = `export const PROGRAM_TARGETS: Record<string, ExerciseTargetConfig> = ${formattedTargets};`;
-  programContent = programContent.replace(/export const PROGRAM_TARGETS: Record<string, ExerciseTargetConfig> = \{[\s\S]*?\n\};/, replacement);
-
-  fs.writeFileSync(programPath, programContent, 'utf8');
-  console.log('\nsrc/data/program.ts успішно оновлено!');
-
-  // Перевірка тестів та білду
   try {
-    console.log('Запуск тестів (npm test)...');
-    execSync('npm test', {cwd: rootDir, stdio: 'inherit'});
-    console.log('Запуск збірки (npm run build)...');
-    execSync('npm run build', {cwd: rootDir, stdio: 'inherit'});
+    console.log('Запуск перевірки типів, тестів та збірки...');
+    execSync('npm run lint && npm test && npm run build', {cwd: rootDir, stdio: 'inherit'});
     console.log('Збірка успішна!');
 
-    // Git commit та push
     try {
-      execSync('git add -A', {cwd: rootDir});
-      execSync(`git commit -m "Coach weekly auto-adaptation: ${adaptations.join('; ')}"`, {cwd: rootDir});
+      execSync(
+        'git add src/data/targets.json assets/ index.html sw.js FORGE-8-single.html',
+        {cwd: rootDir},
+      );
+      execSync(`git commit -m "Coach weekly auto-adaptation: ${adaptations.join('; ')}"`, {
+        cwd: rootDir,
+      });
       console.log('Коміт створено.');
       try {
         execSync('git push origin main', {cwd: rootDir});
-        console.log('Зміни успішно відправлено на GitHub (деплой GitHub Pages активовано).');
+        console.log('Зміни успішно відправлено на GitHub.');
       } catch (pushErr) {
-        console.log('Не вдалося виконати git push (можливо, немає прав або мережі):', pushErr.message);
+        console.log('Не вдалося виконати git push:', pushErr.message);
       }
     } catch (gitErr) {
       console.log('Git commit пропущено:', gitErr.message);
     }
   } catch (buildErr) {
     console.error('Помилка при збірці після адаптації! Відкат змін...');
-    execSync('git checkout -- src/data/program.ts', {cwd: rootDir});
+    execSync('git checkout -- src/data/targets.json', {cwd: rootDir});
   }
 }
 

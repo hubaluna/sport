@@ -1,3 +1,5 @@
+import targetsData from './targets.json';
+
 export const APP_VERSION = '5.3';
 export const PROGRAM_REVISION = 'crossfit-2026-10-v4.0';
 
@@ -27,17 +29,7 @@ export interface ExerciseTargetConfig {
  * - Присідання: підвищено до 2 × 14
  * - Колесо з колін: підвищено до 2 × 5
  */
-export const PROGRAM_TARGETS: Record<string, ExerciseTargetConfig> = {
-  pushups: { sets: 3, reps: 8, rest: 90, repsMax: 10 },
-  lunges: { sets: 2, reps: 8, rest: 60, repsMax: 10 },
-  squats: { sets: 2, reps: 14, rest: 60 },
-  bridge: { sets: 2, reps: 12, rest: 45 },
-  bandRow: { sets: 2, reps: 12, rest: 60, repsMax: 15 },
-  wheel: { sets: 2, reps: 5, rest: 75, repsMax: 6 },
-  deadbug: { sets: 2, reps: 8, rest: 60 },
-  scapPullups: { sets: 2, reps: 5, rest: 60 },
-  negativePullups: { sets: 2, reps: 1, rest: 150, repsMax: 2 },
-};
+export const PROGRAM_TARGETS: Record<string, ExerciseTargetConfig> = targetsData;
 
 export const DAYS = [
   'Понеділок',

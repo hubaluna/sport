@@ -29,6 +29,7 @@ import {
   workoutLog,
 } from './engine/workout';
 import {makeReturnWorkout, makeWorkout} from './engine/session';
+import {useOnlineStatus} from './hooks/useOnlineStatus';
 import {usePWAInstall} from './hooks/usePWAInstall';
 import {useWakeLock} from './hooks/useWakeLock';
 import type {
@@ -142,6 +143,8 @@ export default function App() {
   stateRef.current = state;
 
   const {isInstallable, isInstalled, isIOS, install} = usePWAInstall();
+  const isOnline = useOnlineStatus();
+  const syncingPendingRef = useRef(false);
 
   const shouldKeepAwake =
     state.keepScreen &&
@@ -222,6 +225,49 @@ export default function App() {
   );
 
   // Live timer progression & audio alerts
+  useEffect(() => {
+    const pending = state.pendingSyncIds || [];
+    if (!isOnline || !state.googleDriveUrl || state.googleDriveAutoSync === false) return;
+    if (pending.length === 0 || syncingPendingRef.current) return;
+
+    const pendingLogs = state.logs.filter((l) => pending.includes(l.id));
+    if (pendingLogs.length === 0) {
+      commitState((prev) => ({...prev, pendingSyncIds: []}));
+      return;
+    }
+
+    syncingPendingRef.current = true;
+    void uploadToGoogleDrive(state.googleDriveUrl, state.googleDriveSecret, {
+      logs: pendingLogs,
+      state,
+    })
+      .then((res) => {
+        if (res.ok) {
+          commitState(
+            (prev) => ({
+              ...prev,
+              lastSyncedAt: Date.now(),
+              pendingSyncIds: (prev.pendingSyncIds || []).filter(
+                (id) => !pending.includes(id),
+              ),
+            }),
+            {toast: `Синхронізовано відкладені тренування (${pendingLogs.length})`},
+          );
+        }
+      })
+      .finally(() => {
+        syncingPendingRef.current = false;
+      });
+  }, [
+    isOnline,
+    state.googleDriveUrl,
+    state.googleDriveSecret,
+    state.googleDriveAutoSync,
+    state.pendingSyncIds,
+    state.logs,
+    commitState,
+  ]);
+
   useEffect(() => {
     const active = state.active;
     const wod = state.wod;
@@ -862,12 +908,24 @@ export default function App() {
               );
 
               if (state.googleDriveUrl && state.googleDriveAutoSync !== false) {
-                void uploadToGoogleDrive(state.googleDriveUrl, state.googleDriveSecret, {
+                const url = state.googleDriveUrl;
+                const secret = state.googleDriveSecret;
+                void uploadToGoogleDrive(url, secret, {
                   log: finalLog,
                   state,
                 }).then((res) => {
                   if (res.ok) {
-                    commitState((prev) => ({...prev, lastSyncedAt: Date.now()}));
+                    commitState((prev) => ({
+                      ...prev,
+                      lastSyncedAt: Date.now(),
+                      pendingSyncIds: (prev.pendingSyncIds || []).filter((id) => id !== finalLog.id),
+                    }));
+                  } else {
+                    commitState((prev) => {
+                      const existing = prev.pendingSyncIds || [];
+                      if (existing.includes(finalLog.id)) return prev;
+                      return {...prev, pendingSyncIds: [...existing, finalLog.id]};
+                    });
                   }
                 });
               }
