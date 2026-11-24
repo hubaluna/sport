@@ -691,16 +691,19 @@ export function ProfileView({
 
               {showDriveGuide && (
                 <div className="rounded-xl border border-white/10 bg-[#111310] p-3.5 space-y-2.5 text-xs text-[#DCE3D3]">
-                  <p className="font-semibold text-[#F2F6EB]">Швидке налаштування у 3 кроки:</p>
+                  <p className="font-semibold text-[#F2F6EB]">Швидке налаштування через Google Таблицю (без блокування):</p>
                   <ol className="list-decimal pl-4 space-y-1.5 text-[11px] text-[#9FA995]">
                     <li>
-                      Перейди на <strong className="text-[#F2F6EB]">script.google.com</strong> та натисни <strong className="text-[#F2F6EB]">«Новий проєкт»</strong>.
+                      Перейди на <strong className="text-[#F2F6EB]">sheets.new</strong> (створиться нова таблиця, назви її <strong className="text-[#F2F6EB]">FORGE_8</strong>).
                     </li>
                     <li>
-                      Встав підготовлений код скрипта та натисни <strong className="text-[#F2F6EB]">«Зберегти»</strong>.
+                      У верхньому меню натисни <strong className="text-[#F2F6EB]">Розширення (Extensions)</strong> → <strong className="text-[#F2F6EB]">Apps Script</strong>.
                     </li>
                     <li>
-                      Натисни <strong className="text-[#F2F6EB]">«Розгорнути» (Deploy)</strong> → <strong className="text-[#F2F6EB]">«Нове розгортання»</strong> → тип: <strong className="text-[#F2F6EB]">«Веб-програма»</strong> (Доступ: «Усі», виконання: «Мене»).
+                      Видали все з вікна, встав скопійований код нижче та натисни <strong className="text-[#F2F6EB]">«Зберегти»</strong> (дискетка).
+                    </li>
+                    <li>
+                      Натисни <strong className="text-[#F2F6EB]">«Ввести в дію» (Deploy)</strong> → <strong className="text-[#F2F6EB]">«Нове розгортання»</strong> → обери тип <strong className="text-[#F2F6EB]">«Веб-програма»</strong> (Доступ: «Усі», виконання: «Мене»).
                     </li>
                     <li>
                       Скопіюй отриману <strong className="text-[#F2F6EB]">URL-адресу веб-програми</strong> і встав її в поле вище.
@@ -709,37 +712,39 @@ export function ProfileView({
                   <button
                     type="button"
                     onClick={async () => {
-                      const scriptCode = `/** FORGE / 8 - Google Apps Script Sync */
+                      const scriptCode = `/** @OnlyCurrentDoc - FORGE / 8 Google Sheets Sync */
 const SECRET_KEY = "${driveSecret.trim()}";
-function getOrCreateFolder() {
-  const name = "FORGE_8_Data";
-  const f = DriveApp.getFoldersByName(name);
-  return f.hasNext() ? f.next() : DriveApp.createFolder(name);
+function getOrCreateWorkoutsSheet(ss) {
+  let sheet = ss.getSheetByName("Тренування");
+  if (!sheet) {
+    sheet = ss.insertSheet("Тренування");
+    sheet.appendRow(["Дата", "День", "Назва", "Хвилини", "Віджимання", "Підтягування", "Біль", "RPE", "Запас", "Завершено", "ID", "Повні_Дані_JSON"]);
+    sheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#21271D").setFontColor("#CEFA42");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
 }
 function doPost(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
+    const raw = e.postData ? e.postData.contents : "{}";
+    const data = JSON.parse(raw);
     if (SECRET_KEY && data.secret !== SECRET_KEY) {
-      return ContentService.createTextOutput(JSON.stringify({error:"Unauthorized"})).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({error: "Unauthorized"})).setMimeType(ContentService.MimeType.JSON);
     }
-    const folder = getOrCreateFolder();
-    const files = folder.getFilesByName("forge_workouts.json");
-    let file = files.hasNext() ? files.next() : folder.createFile("forge_workouts.json", "[]", "application/json");
-    let workouts = JSON.parse(file.getBlob().getDataAsString() || "[]");
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = getOrCreateWorkoutsSheet(ss);
     if (data.log) {
-      const idx = workouts.findIndex(w => w.id === data.log.id);
-      if (idx >= 0) workouts[idx] = data.log;
-      else workouts.push(data.log);
-    } else if (Array.isArray(data.logs)) {
-      workouts = data.logs;
+      const l = data.log;
+      let pushups = "", pullups = "";
+      if (Array.isArray(l.entries)) {
+        const pe = l.entries.filter(x => x.name && x.name.includes("Віджимання") && x.reps != null);
+        if (pe.length) pushups = pe.map(x => x.reps).join(" / ");
+        const ple = l.entries.filter(x => x.name && (x.name.includes("підтягуван") || x.name.includes("Тяга")) && x.reps != null);
+        if (ple.length) pullups = ple.map(x => x.reps).join(" / ");
+      }
+      sheet.appendRow([l.date || "", l.day != null ? l.day : "", l.title || "Тренування", l.minutes ? Math.round(l.minutes) : "", pushups, pullups, l.pain != null ? l.pain : 0, l.rpe != null ? l.rpe : "", l.pullReserve != null ? l.pullReserve : "", l.completed ? "Так" : "Ні", l.id || "", JSON.stringify(l)]);
     }
-    file.setContent(JSON.stringify(workouts, null, 2));
-    if (data.state) {
-      const sfld = folder.getFilesByName("forge_state.json");
-      const sf = sfld.hasNext() ? sfld.next() : folder.createFile("forge_state.json", "{}", "application/json");
-      sf.setContent(JSON.stringify(data.state, null, 2));
-    }
-    return ContentService.createTextOutput(JSON.stringify({status:"ok", count: workouts.length})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({status: "ok", count: sheet.getLastRow() - 1, updatedAt: new Date().toISOString()})).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
@@ -748,30 +753,39 @@ function doGet(e) {
   try {
     const token = e.parameter ? e.parameter.secret : "";
     if (SECRET_KEY && token !== SECRET_KEY) {
-      return ContentService.createTextOutput(JSON.stringify({error:"Unauthorized"})).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({error: "Unauthorized"})).setMimeType(ContentService.MimeType.JSON);
     }
     if (e.parameter && e.parameter.action === "ping") {
-      return ContentService.createTextOutput(JSON.stringify({status:"ok", ping:"pong"})).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({status: "ok", ping: "pong"})).setMimeType(ContentService.MimeType.JSON);
     }
-    const folder = getOrCreateFolder();
-    const files = folder.getFilesByName("forge_workouts.json");
-    const content = files.hasNext() ? files.next().getBlob().getDataAsString() : "[]";
-    return ContentService.createTextOutput(content).setMimeType(ContentService.MimeType.JSON);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = getOrCreateWorkoutsSheet(ss);
+    const lastRow = sheet.getLastRow();
+    const workouts = [];
+    if (lastRow > 1) {
+      const values = sheet.getRange(2, 12, lastRow - 1, 1).getValues();
+      for (let i = 0; i < values.length; i++) {
+        if (values[i][0]) {
+          try { workouts.push(JSON.parse(values[i][0])); } catch (_) {}
+        }
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify(workouts)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }`;
                       try {
                         await navigator.clipboard.writeText(scriptCode);
-                        onToast('Код скрипта скопійовано в буфер обміну!');
+                        onToast('Код для Google Таблиці скопійовано!');
                       } catch {
-                        onToast('Код є у файлі scripts/google-drive-sync.gs');
+                        onToast('Код є у файлі scripts/google-sheets-sync.gs');
                       }
                     }}
                     className="mt-2 min-h-[36px] inline-flex items-center gap-1.5 rounded-lg border border-[#CEFA42]/30 bg-[#21271D] px-3 text-xs font-semibold text-[#CEFA42]"
                   >
                     <ClipboardCopy className="w-3.5 h-3.5" />
-                    <span>Скопіювати готовий код скрипта</span>
+                    <span>Скопіювати готовий код для Google Таблиці</span>
                   </button>
                 </div>
               )}
