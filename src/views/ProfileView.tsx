@@ -1,8 +1,12 @@
 import {
   AlertCircle,
   Check,
+  CheckCircle2,
   ClipboardCopy,
+  Cloud,
+  CloudUpload,
   Download,
+  HelpCircle,
   RefreshCw,
   Smartphone,
   Upload,
@@ -25,6 +29,7 @@ import {
 } from '../engine/storage';
 import type {ForgeState} from '../types/forge';
 import {downloadFile, playSignal} from '../utils/audio';
+import {testGoogleDriveConnection, uploadToGoogleDrive} from '../utils/googleDriveSync';
 
 interface ProfileViewProps {
   state: ForgeState;
@@ -56,6 +61,13 @@ export function ProfileView({
   const [backupInput, setBackupInput] = useState('');
   const [exportedCode, setExportedCode] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+
+  const [driveUrl, setDriveUrl] = useState(state.googleDriveUrl || '');
+  const [driveSecret, setDriveSecret] = useState(state.googleDriveSecret || '');
+  const [autoSync, setAutoSync] = useState(state.googleDriveAutoSync ?? true);
+  const [isTestingDrive, setIsTestingDrive] = useState(false);
+  const [isSyncingDrive, setIsSyncingDrive] = useState(false);
+  const [showDriveGuide, setShowDriveGuide] = useState(false);
 
   const parsedBand = parseBandMeta(state.band);
   const resist = state.bandResist || parsedBand.bandResist;
@@ -528,6 +540,241 @@ export function ProfileView({
                 </label>
                 <p className="text-[11px] text-[#9FA995] pl-6">{wakeLockStatusText}</p>
               </div>
+            </div>
+          </section>
+
+          {/* Google Drive Cloud Sync */}
+          <section className="rounded-2xl border border-white/10 bg-[#191D16] p-5 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Cloud className="w-5 h-5 text-[#CEFA42]" />
+                <h2 className="text-base font-bold text-[#F2F6EB]">Google Диск (Хмарне збереження)</h2>
+              </div>
+              <span
+                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                  state.googleDriveUrl
+                    ? 'bg-[#CEFA42]/20 text-[#CEFA42] border border-[#CEFA42]/40'
+                    : 'bg-white/5 text-[#9FA995] border border-white/10'
+                }`}
+              >
+                {state.googleDriveUrl ? 'Підключено' : 'Не налаштовано'}
+              </span>
+            </div>
+
+            <p className="text-xs text-[#9FA995]">
+              Автоматичне надсилання результатів тренувань у твій приватний Google Диск після кожного заняття. Щонеділі тренер аналізує збережені дані та адаптує кількість підходів і повторень у програмі.
+            </p>
+
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-[#DCE3D3] mb-1.5">
+                  URL веб-програми Google Apps Script
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  value={driveUrl}
+                  onChange={(e) => setDriveUrl(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#111310] px-3 py-2 text-xs text-[#F2F6EB] placeholder:text-[#5F6759] focus:border-[#CEFA42] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#DCE3D3] mb-1.5">
+                  Секретний ключ (Secret Token, якщо вказано у скрипті)
+                </label>
+                <input
+                  type="password"
+                  placeholder="Залиш пустим або введи SECRET_KEY зі скрипта"
+                  value={driveSecret}
+                  onChange={(e) => setDriveSecret(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#111310] px-3 py-2 text-xs text-[#F2F6EB] placeholder:text-[#5F6759] focus:border-[#CEFA42] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2.5 text-xs text-[#DCE3D3] cursor-pointer min-h-[36px]">
+                  <input
+                    type="checkbox"
+                    checked={autoSync}
+                    onChange={(e) => setAutoSync(e.target.checked)}
+                    className="h-4 w-4 accent-[#CEFA42]"
+                  />
+                  <span>Автоматично зберігати на Google Диск після завершення вправ</span>
+                </label>
+              </div>
+
+              {state.lastSyncedAt ? (
+                <p className="text-[11px] text-[#9FA995]">
+                  Остання синхронізація:{' '}
+                  <span className="text-[#CEFA42] font-mono">
+                    {new Date(state.lastSyncedAt).toLocaleString('uk-UA')}
+                  </span>
+                </p>
+              ) : null}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateState(
+                      (prev) => ({
+                        ...prev,
+                        googleDriveUrl: driveUrl.trim(),
+                        googleDriveSecret: driveSecret.trim(),
+                        googleDriveAutoSync: autoSync,
+                      }),
+                      'Налаштування Google Диска збережено',
+                    );
+                  }}
+                  className="min-h-[40px] inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#CEFA42] px-3 text-xs font-bold text-[#111310]"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Зберегти</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!driveUrl || isTestingDrive}
+                  onClick={async () => {
+                    setIsTestingDrive(true);
+                    const res = await testGoogleDriveConnection(driveUrl, driveSecret);
+                    setIsTestingDrive(false);
+                    if (res.ok) {
+                      onToast('Зв’язок із Google Диском успішний!');
+                    } else {
+                      onToast(`Помилка зв’язку: ${res.error || 'помилка'}`);
+                    }
+                  }}
+                  className="min-h-[40px] inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-[#21271D] px-3 text-xs font-semibold text-[#F2F6EB] disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-[#CEFA42] ${isTestingDrive ? 'animate-spin' : ''}`} />
+                  <span>Перевірити зв'язок</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!driveUrl || isSyncingDrive}
+                  onClick={async () => {
+                    setIsSyncingDrive(true);
+                    const res = await uploadToGoogleDrive(driveUrl, driveSecret, {
+                      logs: state.logs,
+                      state,
+                    });
+                    setIsSyncingDrive(false);
+                    if (res.ok) {
+                      onUpdateState(
+                        (prev) => ({...prev, lastSyncedAt: Date.now()}),
+                        `Синхронізовано записів: ${res.count ?? state.logs.length}`,
+                      );
+                    } else {
+                      onToast(`Помилка: ${res.error}`);
+                    }
+                  }}
+                  className="min-h-[40px] inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-[#21271D] px-3 text-xs font-semibold text-[#F2F6EB] disabled:opacity-50"
+                >
+                  <CloudUpload className={`w-3.5 h-3.5 text-[#CEFA42] ${isSyncingDrive ? 'animate-pulse' : ''}`} />
+                  <span>Синхронізувати все</span>
+                </button>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDriveGuide((v) => !v)}
+                  className="text-xs text-[#CEFA42] hover:underline inline-flex items-center gap-1"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>{showDriveGuide ? 'Приховати інструкцію' : 'Як підключити свій Google Диск (1 хвилина)'}</span>
+                </button>
+              </div>
+
+              {showDriveGuide && (
+                <div className="rounded-xl border border-white/10 bg-[#111310] p-3.5 space-y-2.5 text-xs text-[#DCE3D3]">
+                  <p className="font-semibold text-[#F2F6EB]">Швидке налаштування у 3 кроки:</p>
+                  <ol className="list-decimal pl-4 space-y-1.5 text-[11px] text-[#9FA995]">
+                    <li>
+                      Перейди на <strong className="text-[#F2F6EB]">script.google.com</strong> та натисни <strong className="text-[#F2F6EB]">«Новий проєкт»</strong>.
+                    </li>
+                    <li>
+                      Встав підготовлений код скрипта та натисни <strong className="text-[#F2F6EB]">«Зберегти»</strong>.
+                    </li>
+                    <li>
+                      Натисни <strong className="text-[#F2F6EB]">«Розгорнути» (Deploy)</strong> → <strong className="text-[#F2F6EB]">«Нове розгортання»</strong> → тип: <strong className="text-[#F2F6EB]">«Веб-програма»</strong> (Доступ: «Усі», виконання: «Мене»).
+                    </li>
+                    <li>
+                      Скопіюй отриману <strong className="text-[#F2F6EB]">URL-адресу веб-програми</strong> і встав її в поле вище.
+                    </li>
+                  </ol>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const scriptCode = `/** FORGE / 8 - Google Apps Script Sync */
+const SECRET_KEY = "${driveSecret.trim()}";
+function getOrCreateFolder() {
+  const name = "FORGE_8_Data";
+  const f = DriveApp.getFoldersByName(name);
+  return f.hasNext() ? f.next() : DriveApp.createFolder(name);
+}
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    if (SECRET_KEY && data.secret !== SECRET_KEY) {
+      return ContentService.createTextOutput(JSON.stringify({error:"Unauthorized"})).setMimeType(ContentService.MimeType.JSON);
+    }
+    const folder = getOrCreateFolder();
+    const files = folder.getFilesByName("forge_workouts.json");
+    let file = files.hasNext() ? files.next() : folder.createFile("forge_workouts.json", "[]", "application/json");
+    let workouts = JSON.parse(file.getBlob().getDataAsString() || "[]");
+    if (data.log) {
+      const idx = workouts.findIndex(w => w.id === data.log.id);
+      if (idx >= 0) workouts[idx] = data.log;
+      else workouts.push(data.log);
+    } else if (Array.isArray(data.logs)) {
+      workouts = data.logs;
+    }
+    file.setContent(JSON.stringify(workouts, null, 2));
+    if (data.state) {
+      const sfld = folder.getFilesByName("forge_state.json");
+      const sf = sfld.hasNext() ? sfld.next() : folder.createFile("forge_state.json", "{}", "application/json");
+      sf.setContent(JSON.stringify(data.state, null, 2));
+    }
+    return ContentService.createTextOutput(JSON.stringify({status:"ok", count: workouts.length})).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+function doGet(e) {
+  try {
+    const token = e.parameter ? e.parameter.secret : "";
+    if (SECRET_KEY && token !== SECRET_KEY) {
+      return ContentService.createTextOutput(JSON.stringify({error:"Unauthorized"})).setMimeType(ContentService.MimeType.JSON);
+    }
+    if (e.parameter && e.parameter.action === "ping") {
+      return ContentService.createTextOutput(JSON.stringify({status:"ok", ping:"pong"})).setMimeType(ContentService.MimeType.JSON);
+    }
+    const folder = getOrCreateFolder();
+    const files = folder.getFilesByName("forge_workouts.json");
+    const content = files.hasNext() ? files.next().getBlob().getDataAsString() : "[]";
+    return ContentService.createTextOutput(content).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+                      try {
+                        await navigator.clipboard.writeText(scriptCode);
+                        onToast('Код скрипта скопійовано в буфер обміну!');
+                      } catch {
+                        onToast('Код є у файлі scripts/google-drive-sync.gs');
+                      }
+                    }}
+                    className="mt-2 min-h-[36px] inline-flex items-center gap-1.5 rounded-lg border border-[#CEFA42]/30 bg-[#21271D] px-3 text-xs font-semibold text-[#CEFA42]"
+                  >
+                    <ClipboardCopy className="w-3.5 h-3.5" />
+                    <span>Скопіювати готовий код скрипта</span>
+                  </button>
+                </div>
+              )}
             </div>
           </section>
 

@@ -334,6 +334,10 @@ export interface ForgeState {
   calendarSeen?: string;
   calendarRevision?: number;
   wod: WodState | null;
+  googleDriveUrl?: string;
+  googleDriveSecret?: string;
+  googleDriveAutoSync?: boolean;
+  lastSyncedAt?: number;
 }
 
 export interface ExerciseHelp {

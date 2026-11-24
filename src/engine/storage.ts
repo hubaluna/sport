@@ -73,6 +73,10 @@ export function baseState(now = new Date()): ForgeState {
     keepScreen: true,
     installDismissed: false,
     wod: null,
+    googleDriveUrl: '',
+    googleDriveSecret: '',
+    googleDriveAutoSync: true,
+    lastSyncedAt: 0,
   };
 }
 
@@ -304,7 +308,11 @@ export function validState(s: unknown): s is ForgeState {
     x.logs.every(validLog) &&
     Array.isArray(x.ready) &&
     x.ready.every((n) => Number.isInteger(n) && numberOK(n, 0, 7)) &&
-    (!x.active || validWorkout(x.active))
+    (!x.active || validWorkout(x.active)) &&
+    (x.googleDriveUrl === undefined || textOK(x.googleDriveUrl, 1000)) &&
+    (x.googleDriveSecret === undefined || textOK(x.googleDriveSecret, 200)) &&
+    (x.googleDriveAutoSync === undefined || typeof x.googleDriveAutoSync === 'boolean') &&
+    (x.lastSyncedAt === undefined || optNum(x.lastSyncedAt, 0, 9999999999999))
   );
 }
 
@@ -350,6 +358,10 @@ export function recoverState(candidate: unknown): ForgeState | null {
   if (Array.isArray(c.logs)) {
     next.logs = c.logs.filter(validLog).slice(0, 3000);
   }
+  if (textOK(c.googleDriveUrl, 1000)) next.googleDriveUrl = c.googleDriveUrl;
+  if (textOK(c.googleDriveSecret, 200)) next.googleDriveSecret = c.googleDriveSecret;
+  if (typeof c.googleDriveAutoSync === 'boolean') next.googleDriveAutoSync = c.googleDriveAutoSync;
+  if (typeof c.lastSyncedAt === 'number') next.lastSyncedAt = c.lastSyncedAt;
   next.active = validWorkout(c.active) ? c.active : null;
   return validState(next) ? next : null;
 }

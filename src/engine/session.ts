@@ -1,4 +1,4 @@
-import {MOVES, PROFILE, PROGRAM_REVISION, TECHNIQUE} from '../data/program';
+import {MOVES, PROFILE, PROGRAM_REVISION, PROGRAM_TARGETS, TECHNIQUE} from '../data/program';
 import type {
   ForgeState,
   SessionPlan,
@@ -216,11 +216,11 @@ export function buildSessionPlan(
   const rowBand = () =>
     reps(
       'Тяга резинки сидячи',
-      2,
-      10,
-      60,
+      PROGRAM_TARGETS.bandRow.sets,
+      PROGRAM_TARGETS.bandRow.reps,
+      PROGRAM_TARGETS.bandRow.rest,
       'Перевір резинку, обведи середину навколо середньої частини обох стоп, а не носків. Сиди зі стабільною спиною, тягни до нижніх ребер. Резинка не має бути спрямована в обличчя.',
-      {repsMax: 12},
+      {repsMax: PROGRAM_TARGETS.bandRow.repsMax ?? 12},
     );
 
   if ([1, 3, 5].includes(day)) {
@@ -376,9 +376,9 @@ export function buildSessionPlan(
         rows.push(
           reps(
             'Лопаткові підтягування',
-            light ? 1 : 2,
-            5,
-            60,
+            light ? 1 : PROGRAM_TARGETS.scapPullups.sets,
+            PROGRAM_TARGETS.scapPullups.reps,
+            PROGRAM_TARGETS.scapPullups.rest,
             'Лікті прямі, плавний короткий рух лопатками; за потреби опора стоп.',
           ),
         );
@@ -387,34 +387,39 @@ export function buildSessionPlan(
         rows.push(
           reps(
             'Негативні підтягування',
-            2,
-            1,
-            150,
+            PROGRAM_TARGETS.negativePullups.sets,
+            PROGRAM_TARGETS.negativePullups.reps,
+            PROGRAM_TARGETS.negativePullups.rest,
             '1–2 повторення лише з контролем 3–5 с і безпечною опорою. За втрати контролю пропусти. Обсяг не збільшуй разом з основними підтягуваннями.',
-            {repsMax: 2, assistance: 'negative', bucket: 'accessory', optional: true},
+            {repsMax: PROGRAM_TARGETS.negativePullups.repsMax ?? 2, assistance: 'negative', bucket: 'accessory', optional: true},
           ),
         );
       }
       rows.push(
         reps(
           'Віджимання від підлоги',
-          light ? 2 : 3,
-          6,
-          90,
+          light ? 2 : PROGRAM_TARGETS.pushups.sets,
+          PROGRAM_TARGETS.pushups.reps,
+          PROGRAM_TARGETS.pushups.rest,
           'Повна амплітуда, запас 1–2. За потреби — від надійної високої опори, познач заміну.',
-          {repsMax: 8},
+          {repsMax: PROGRAM_TARGETS.pushups.repsMax ?? 8},
         ),
-        reps('Зворотні випади', light ? 1 : 2, 8, 60, 'Крок назад, коліно в напрямку носка.', {
-          perSide: true,
-        }),
+        reps(
+          'Зворотні випади',
+          light ? 1 : PROGRAM_TARGETS.lunges.sets,
+          PROGRAM_TARGETS.lunges.reps,
+          PROGRAM_TARGETS.lunges.rest,
+          'Крок назад, коліно в напрямку носка.',
+          {perSide: true},
+        ),
       );
       if (state.coach?.core === 'deadbug') {
         rows.push(
           reps(
             'Мертвий жук',
-            light ? 1 : 2,
-            8,
-            60,
+            light ? 1 : PROGRAM_TARGETS.deadbug.sets,
+            PROGRAM_TARGETS.deadbug.reps,
+            PROGRAM_TARGETS.deadbug.rest,
             'Протилежні рука й нога; поперек стабільний.',
             {perSide: true},
           ),
@@ -423,11 +428,11 @@ export function buildSessionPlan(
         rows.push(
           reps(
             'Колесо з колін',
-            light ? 1 : 2,
-            4,
-            75,
+            light ? 1 : PROGRAM_TARGETS.wheel.sets,
+            PROGRAM_TARGETS.wheel.reps,
+            PROGRAM_TARGETS.wheel.rest,
             '4–6 лише без прогину попереку. Скороти амплітуду або обери «Мертвий жук» у профілі: 2×8 на сторону.',
-            {repsMax: 6},
+            {repsMax: PROGRAM_TARGETS.wheel.repsMax ?? 6},
           ),
         );
       }
@@ -454,8 +459,21 @@ export function buildSessionPlan(
         }
         rows.push(
           rowBand(),
-          reps('Присідання без стрибка', light ? 1 : 2, 12, 60, 'Контроль колін і стабільний корпус.'),
-          reps('Зворотні випади', light ? 1 : 2, 8, 60, 'Рівномірно на обидві ноги.', {perSide: true}),
+          reps(
+            'Присідання без стрибка',
+            light ? 1 : PROGRAM_TARGETS.squats.sets,
+            PROGRAM_TARGETS.squats.reps,
+            PROGRAM_TARGETS.squats.rest,
+            'Контроль колін і стабільний корпус.',
+          ),
+          reps(
+            'Зворотні випади',
+            light ? 1 : PROGRAM_TARGETS.lunges.sets,
+            PROGRAM_TARGETS.lunges.reps,
+            PROGRAM_TARGETS.lunges.rest,
+            'Рівномірно на обидві ноги.',
+            {perSide: true},
+          ),
         );
       }
       rows.push(
@@ -488,9 +506,9 @@ export function buildSessionPlan(
           rowBand(),
           reps(
             'Сідничний міст',
-            light ? 1 : 2,
-            12,
-            45,
+            light ? 1 : PROGRAM_TARGETS.bridge.sets,
+            PROGRAM_TARGETS.bridge.reps,
+            PROGRAM_TARGETS.bridge.rest,
             'Напруж сідниці, піднімай таз без перерозгинання попереку.',
           ),
         );

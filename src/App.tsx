@@ -40,6 +40,7 @@ import type {
   WorkoutSession,
 } from './types/forge';
 import {playSignal, unlockAudio} from './utils/audio';
+import {uploadToGoogleDrive} from './utils/googleDriveSync';
 import {DiaryView} from './views/DiaryView';
 import {FullPlanView} from './views/FullPlanView';
 import {GuideView} from './views/GuideView';
@@ -859,6 +860,18 @@ export default function App() {
                   toast: changes[0] || 'Тренування збережено в щоденник',
                 },
               );
+
+              if (state.googleDriveUrl && state.googleDriveAutoSync !== false) {
+                void uploadToGoogleDrive(state.googleDriveUrl, state.googleDriveSecret, {
+                  log: finalLog,
+                  state,
+                }).then((res) => {
+                  if (res.ok) {
+                    commitState((prev) => ({...prev, lastSyncedAt: Date.now()}));
+                  }
+                });
+              }
+
               navigate(isTest ? 'diary' : 'home');
             }}
             onNavigate={navigate}

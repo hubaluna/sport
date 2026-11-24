@@ -12,6 +12,29 @@ export const PROFILE = {
   band: 'Товста зелена резинка',
 } as const;
 
+export interface ExerciseTargetConfig {
+  sets: number;
+  reps: number;
+  rest: number;
+  repsMax?: number;
+}
+
+/**
+ * Базові налаштування кількості підходів та повторень для вправ.
+ * Адаптуються автоматично щотижня на основі щоденника тренувань.
+ */
+export const PROGRAM_TARGETS: Record<string, ExerciseTargetConfig> = {
+  pushups: { sets: 3, reps: 6, rest: 90, repsMax: 8 },
+  lunges: { sets: 2, reps: 8, rest: 60 },
+  squats: { sets: 2, reps: 12, rest: 60 },
+  bridge: { sets: 2, reps: 12, rest: 45 },
+  bandRow: { sets: 2, reps: 10, rest: 60, repsMax: 12 },
+  wheel: { sets: 2, reps: 4, rest: 75, repsMax: 6 },
+  deadbug: { sets: 2, reps: 8, rest: 60 },
+  scapPullups: { sets: 2, reps: 5, rest: 60 },
+  negativePullups: { sets: 2, reps: 1, rest: 150, repsMax: 2 },
+};
+
 export const DAYS = [
   'Понеділок',
   'Вівторок',
