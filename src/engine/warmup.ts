@@ -14,6 +14,7 @@ export interface WarmupFeatures {
   horizontalPull: boolean;
   push: boolean;
   legs: boolean;
+  bridge: boolean;
   core: boolean;
   wheel: boolean;
   jump: boolean;
@@ -38,6 +39,7 @@ export function analyzeWarmupPlan(rows: SessionRow[]): WarmupFeatures {
     horizontalPull: ids.has('band-row-seated') || /тяга резинки сидяч|горизонтальн.*тяг/.test(names),
     push: complex || ids.has('push-up') || /віджим/.test(names),
     legs: complex || ids.has('lower-body') || /присід|присідан|випади|міст/.test(names),
+    bridge: /міст/.test(names),
     core: complex || ids.has('core') || /колесо|жук|планк|прес/.test(names),
     wheel: /колесо/.test(names),
     jump: complex || /стриб/.test(names),
@@ -71,32 +73,38 @@ export function buildWarmup({
 
   const templates: Record<number, [string, number][]> = {
     0: [
-      ['walk', 120],
-      ['shoulders', 60],
-      ['wrists', 60],
-      ['scap', 120],
-      ['chest', 60],
-      ['legs', 60],
-      ['pullPrep', 120],
+      ['walk', 75],
+      ['shoulders', 45],
+      ['wrists', 45],
+      ['chest', 45],
+      ['rotatorCuff', 55],
+      ['scap', 65],
+      ['legs', 45],
+      ['pullPrep', 75],
     ],
     2: [
-      ['walk', 120],
-      ['shoulders', 60],
-      ['legs', 90],
-      ['lunges', 60],
-      ['pushPrep', 60],
-      ['plank', 60],
-      ['rehearsal', 150],
+      ['walk', 75],
+      ['shoulders', 45],
+      ['wristLoad', 45],
+      ['anklePrep', 45],
+      ['legs', 55],
+      ['gluteBridgePrep', 50],
+      ['pushPrep', 55],
+      ['plank', 50],
+      ['rehearsal', 95],
     ],
     4: [
-      ['walk', 120],
-      ['wrists', 60],
-      ['hips', 60],
-      ['legs', 60],
-      ['lunges', 60],
-      ['scap', 90],
-      ['pullPrep', 90],
-      ['core', 60],
+      ['walk', 75],
+      ['wrists', 45],
+      ['shoulders', 45],
+      ['rotatorCuff', 50],
+      ['anklePrep', 45],
+      ['hips', 45],
+      ['legs', 45],
+      ['lunges', 50],
+      ['scap', 55],
+      ['pullPrep', 65],
+      ['core', 45],
     ],
     6: [
       ['walk', 120],
@@ -116,12 +124,14 @@ export function buildWarmup({
     if (!chosen.some(([k]) => k === key)) chosen.push([key, time]);
   };
 
+  if (f.pull || f.verticalBandPull || f.horizontalPull) {
+    ensure('shoulders', 45);
+    ensure('wrists', 45);
+    ensure('rotatorCuff', 55);
+  }
   if (f.pull) {
-    ensure('shoulders', 60);
-    ensure('wrists', 60);
-    ensure('scap', 90);
-    if (f.bandPull) ensure('pullPrep', 90);
-    else ensure('scap', 60);
+    ensure('scap', 65);
+    if (f.bandPull) ensure('pullPrep', 75);
   }
   if (f.verticalBandPull) ensure('latPrep', 60);
   if (f.foundation) {
@@ -130,17 +140,25 @@ export function buildWarmup({
       t,
     ]);
   }
-  if (f.horizontalPull) ensure('rowPrep', 45);
+  if (f.horizontalPull) ensure('rowPrep', 50);
   if (f.push) {
-    ensure('wrists', 45);
+    ensure('wristLoad', 45);
+    ensure('chest', 45);
     ensure('shoulders', 45);
-    ensure('pushPrep', 45);
+    ensure('pushPrep', 55);
   }
-  if (f.legs) ensure('hips', 45);
-  if (f.core && !chosen.some(([k]) => k === 'core' || k === 'plank')) ensure('core', 45);
-  if (f.wheel) ensure('core', 45);
+  if (f.legs || f.bridge) {
+    ensure('anklePrep', 45);
+    ensure('hips', 45);
+    ensure('gluteBridgePrep', 50);
+  }
+  if (f.core && !chosen.some(([k]) => k === 'core' || k === 'plank')) ensure('core', 50);
+  if (f.wheel) {
+    ensure('wristLoad', 45);
+    ensure('core', 50);
+  }
   if (testing) ensure('recovery', 120);
-  if (f.jump && !chosen.some(([k]) => k === 'rehearsal' || k === 'landing')) ensure('landing', 45);
+  if (f.jump && !chosen.some(([k]) => k === 'rehearsal' || k === 'landing')) ensure('landing', 50);
   if (!f.complex) chosen = chosen.filter(([k]) => k !== 'rehearsal');
 
   chosen = chosen.map(([key, t]) =>
@@ -161,13 +179,31 @@ export function buildWarmup({
   const target = testing ? 720 : normal;
   const sum = chosen.reduce((n, x) => n + x[1], 0);
   if (sum < target) {
-    chosen[0][1] += target - sum;
+    // Додаємо вільний час насамперед у цільову активацію та підвідні рухи робочих м’язів
+    let extra = target - sum;
+    const priorityIdx = chosen
+      .map((item, i) => ({i, pat: PREP_LIBRARY[item[0]].pattern}))
+      .filter((x) => x.pat === 'specific' || x.pat === 'activation')
+      .map((x) => x.i);
+    const pool = priorityIdx.length ? priorityIdx : [0];
+    let p = 0;
+    while (extra > 0) {
+      const add = Math.min(extra, 10);
+      chosen[pool[p % pool.length]][1] += add;
+      extra -= add;
+      p++;
+    }
   } else if (sum > target) {
-    const minimum = chosen.map(([k]) =>
-      k === 'shoulders' || k === 'wrists' ? 60 : k === 'walk' ? 90 : 30,
-    );
+    // При скороченні спочатку зменшуємо загальні вправи, зберігаючи час на цільові м’язи
+    const minimum = chosen.map(([k]) => {
+      const pat = PREP_LIBRARY[k].pattern;
+      if (k === 'walk') return 60;
+      if (pat === 'specific') return 45;
+      if (pat === 'activation') return 40;
+      return 30;
+    });
     let excess = sum - target;
-    for (let i = chosen.length - 1; i >= 0 && excess > 0; i--) {
+    for (let i = 0; i < chosen.length && excess > 0; i++) {
       const take = Math.min(excess, Math.max(0, chosen[i][1] - minimum[i]));
       chosen[i][1] -= take;
       excess -= take;
@@ -228,6 +264,16 @@ export function buildWarmup({
 
   const dayMap: Record<number, string> = {0: 'А', 2: 'Б', 4: 'В', 6: 'Г'};
 
+  const focusGroups: string[] = [];
+  if (f.pull || f.verticalBandPull || f.horizontalPull) focusGroups.push('спина й лопатки');
+  if (f.push) focusGroups.push('груди, плечі й кисті');
+  if (f.legs || f.bridge || f.jump) focusGroups.push('ноги, коліна й сідниці');
+  if (f.core || f.wheel) focusGroups.push('кор');
+
+  const focusText = focusGroups.length
+    ? `Загальний розігрів → акцент на цільові м’язи (${focusGroups.join(', ')}) → підвідні повторення.`
+    : 'Загальний розігрів → мобільність → активація → репетиція фактичних рухів.';
+
   return {
     name: testing ? 'Розминка перед контрольним тестом' : `Розминка ${dayMap[day] || 'відновлення'}`,
     seconds: parts.reduce((n, p) => n + p.seconds, 0),
@@ -242,7 +288,7 @@ export function buildWarmup({
         ? 'Для запланованих підтягувань бракує перекладини або резинки. Розминка їх не замінює: перевір план та інвентар.'
         : light
           ? 'Легка активація й більше відновлення без збільшення повторень.'
-          : 'Загальний розігрів → мобільність → активація → репетиція фактичних рухів.',
+          : focusText,
   };
 }
 
